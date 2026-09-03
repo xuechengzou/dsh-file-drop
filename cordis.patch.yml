@@ -1,0 +1,5 @@
+# Standard DSH bundle mount. Install this package with `dsh plugin add`;
+# the CLI will append this bundle automatically, so no profile patch is needed.
+- insert:
+    - id: dsh-file-drop
+      name: 'dsh-file-drop'
