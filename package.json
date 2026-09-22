@@ -1,7 +1,7 @@
 {
   "name": "dsh-file-drop",
-  "version": "1.1.0-alpha.2",
-  "description": "Drag and drop files into the DSH web composer and attach workspace references to the next message.",
+  "version": "2.0.0",
+  "description": "Gap-only extension for the DSH web composer attachment intake: a dropped folder is expanded into its individual files and handed back to the built-in intake, so the native rail, upload progress, limits and notices are reused unchanged.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -19,29 +19,26 @@
     "README.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "node test/package.test.mjs && node test/logic.test.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "drag-and-drop",
+    "file-upload",
+    "cordis"
+  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-slots"
-      ],
-      "platform": "web"
+      "platform": "web",
+      "immediately": true,
+      "inject": []
     }
-  },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-agent": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-client-ui-slots": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-fs-sandbox": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-host-webserver": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-pwsh-sandbox": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-sandbox-policy": "^0.1.2-alpha.2",
-    "@deepseek-ai/dsh-session": "^0.1.2-alpha.2",
-    "react": "^18.2.0"
   },
   "license": "MIT"
 }

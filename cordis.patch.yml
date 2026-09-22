@@ -1,5 +1,6 @@
-# Standard DSH bundle mount. Install this package with `dsh plugin add`;
-# the CLI will append this bundle automatically, so no profile patch is needed.
+# dsh-file-drop bundle patch: mount the package under its own name so the
+# profile resolves it through node_modules. The Host half is intentionally a
+# no-op; every behaviour lives in the browser half.
 - insert:
     - id: dsh-file-drop
       name: 'dsh-file-drop'
