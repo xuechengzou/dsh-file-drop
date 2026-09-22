@@ -2,11 +2,7 @@
 
 A **gap-only** extension for the DSH web composer's file intake.
 
-Drag a **folder** into the composer and its files are added individually
-through DSH's own attachment intake — so the native rail, upload progress,
-limits and notices are used unchanged.
-
-## Why 2.0.0 is a rewrite
+## What changed in 2.0.0
 
 DSH core now ships the complete attachment pipeline:
 
@@ -17,56 +13,94 @@ DSH core now ships the complete attachment pipeline:
 | Draft attachment rail, file cards, drop overlay, lightbox | `@deepseek-ai/dsh-client-ui-attachment` |
 | Verbatim storage, receipt admission, model-facing handle text | `@deepseek-ai/dsh-attachment*`, `ctx.fileUploads` |
 
-Version 1 predated all of that. It duplicated the feature — its own chip rail,
-its own full-screen drop mask, its own toast, plus a `drops/` directory and an
-`agent/pre-step` middleware injecting `@drops/...` references — **and it
-registered its document `drop` listener in the capture phase with
-`stopPropagation()`**. Capture runs before the core's bubble-phase listener, so
-the core never received a drop at all: enabling v1 disabled the built-in drag &
-drop. That is why profiles ended up carrying
+Version 1 of this plugin predated all of that. It duplicated the feature — its
+own chip rail, its own full-screen drop mask, its own toast, plus a `drops/`
+directory and an `agent/pre-step` middleware that injected `@drops/...`
+references — and it registered its document `drop` listener in the **capture**
+phase with `stopPropagation()`. Because capture runs before the core's
+bubble-phase listener, the core never received a drop: enabling the plugin
+disabled the built-in drag & drop. That is why the profile carried
 `- id: dsh-file-drop` / `disabled: true`.
 
-2.0.0 keeps only the part the core genuinely lacks.
+## What this plugin still contributes
 
-## What it contributes
+Exactly one thing the core does not do: **expanding a dropped folder into its
+individual files.**
 
-**Folder expansion.** The core reads `dataTransfer.files`, where a dropped
-directory surfaces as a single phantom 0-byte entry. This plugin detects the
-directory case with `webkitGetAsEntry()`, walks it (bounded to 2000 files /
-16 levels), and re-dispatches the collected files as an ordinary file-only
+A dropped folder is walked with `webkitGetAsEntry()` (bounded to 2000 files /
+16 levels), and the collected files are re-dispatched as an ordinary file-only
 `drop` event — so the core's validation, limits, notices, rail, upload path and
 progress all run exactly as if those files had been dropped directly.
+
+## Deliberate policy override (DSH 0.1.7+)
+
+DSH 0.1.7 added folder *detection* but made folders a desktop-only feature. In
+`ui-conversation`'s `addFiles()`:
+
+```js
+if (bridge === void 0 && directory) return t("attachment.directoryDesktopOnly")
+```
+
+where `bridge` is `globalThis.__DSH_HOST_PATHS__`. In a browser that global is
+**never set** — no shipped package assigns it — so a dropped folder is rejected
+with the notice *"folders can only be added in the desktop app; add individual
+files in the browser"*. On desktop the folder becomes an `@path/` **reference
+chip**, not expanded files.
+
+This plugin intentionally overrides that browser policy. That is a product
+decision, not an oversight:
+
+- **While the plugin is enabled, the browser accepts a dropped folder** and adds
+  its files individually.
+- **Disable or remove the plugin** to get stock 0.1.7 behaviour back (folder
+  rejected in the browser, reference chip on desktop).
+
+The override is safe because the hand-off is a synthetic file-only drop:
+`droppedDirectories()` calls `item.webkitGetAsEntry()` and skips anything that
+is not `isDirectory === true`, so the expanded files take the core's ordinary
+upload path with no directory semantics attached.
 
 ## Non-interference guarantees
 
 1. **Plain-file drops are never touched.** The capture-phase handler returns
    immediately unless a directory entry is actually present.
-2. **No UI is rendered.** No rail, mask, toast or chip row, so nothing can
-   diverge from the native presentation. The core's drop overlay and attachment
-   rail remain the only presentation.
+2. **No UI is rendered.** There is no rail, mask, toast or chip row, so nothing
+   can diverge from the native presentation. The core's drop overlay and
+   attachment rail remain the only presentation.
 3. **No Host behaviour.** `lib/index.js` is an intentional no-op with an empty
-   `inject` list, so the plugin cannot break profile boot or interfere with
+   `inject` list, so this plugin cannot break profile boot or interfere with
    `ctx.fileUploads` / `ctx.attachments`.
-4. **No parallel storage.** Nothing is written to `drops/`, and no
+4. **No parallel storage.** Nothing is written to `drops/` and no
    `@drops/...` references are injected. Natively attached files already reach
-   the model as a read-only host-path handle, which is the core's own contract.
-5. **Fail-safe.** If the composer is not mounted, or the browser exposes no
-   directory-entry API, the plugin stays out of the way and the core's
+   the model as a read-only host path handle, which is the core's own contract.
+5. **Fail-safe.** If the composer is not mounted, or the browser does not expose
+   the directory-entry API, the plugin stays out of the way and the core's
    pre-existing behaviour applies.
+
+## Compatibility
+
+Developed and verified against **DSH 0.1.6-alpha.2** and re-checked against
+**0.1.7-alpha.1**, where the folder contract changed as described above. The
+plugin touches only two 0.1.7 surfaces, both stable:
+
+- the composer's hidden file input, used purely as a presence probe
+  (`[data-composer-card] input[type="file"]`)
+- the document `drop` event, and the core's own bubble-phase listener that
+  receives the re-dispatched hand-off
 
 ## Install
 
 ```powershell
-dsh plugin --profile <profile> add <path-to-this-directory>
+dsh plugin --profile web add <path-to-this-directory>
 ```
 
-Then make sure both enablement layers agree:
+Two profile-level facts must hold for the plugin to activate:
 
-1. The profile patch (`~/.dsh/profiles/<profile>/cordis.patch.yml`) must carry
-   the force-enable row `- id: dsh-file-drop` / `disabled: false`.
-2. The plugin market's state (`~/.dsh/profiles/<profile>/.dsh-market/state.json`)
-   must not list `dsh-file-drop` in its `disabled` array. The market keeps its
-   own disable list there and re-asserts it on **every boot**, so a stale entry
+1. `~/.dsh/profiles/web/cordis.patch.yml` must carry the force-enable row:
+   `- id: dsh-file-drop` / `disabled: false`.
+2. `~/.dsh/profiles/web/.dsh-market/state.json` must not list
+   `dsh-file-drop` in its `disabled` array. The plugin market keeps its own
+   disable list there and re-asserts it on **every boot**, so a stale entry
    holds the row down even when the patch layer enables it.
 
 Keep the force-enable row **outside** any `# <plugin>: begin/end` marker block —
@@ -82,10 +116,3 @@ required after changing enablement.
 node test/package.test.mjs   # manifest + both artifact shapes
 node test/logic.test.mjs     # drop gating and the bounded folder walk
 ```
-
-`logic.test.mjs` runs the shipped `lib/client.js` in a stubbed environment, so
-it exercises the artifact that actually loads rather than a copy.
-
-## License
-
-MIT

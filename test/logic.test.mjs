@@ -208,5 +208,56 @@ assert.ok(
 )
 console.log("PASS: unreadable folder resets the overlay without dispatching")
 
+// ---- 6. the hand-off must carry NO directory entries ---------------------
+// This is what makes the deliberate 0.1.7 policy override safe. 0.1.7's
+// droppedDirectories() decides "this is a folder" solely from
+// `item.webkitGetAsEntry()?.isDirectory === true`. If the synthetic drop
+// exposed such an entry, the core would classify the expanded files as
+// directories and reject the whole batch in a browser. Assert the synthetic
+// transfer reports nothing directory-shaped.
+const seen = []
+globalThis.DataTransfer = class {
+  constructor() {
+    const files = []
+    this.files = files
+    this.items = {
+      add: (file) => files.push(file),
+      // Mimic a browser: programmatically added items expose no entry.
+      [Symbol.iterator]: function* () {
+        for (const f of files) {
+          yield { kind: "file", getAsFile: () => f, webkitGetAsEntry: () => null }
+        }
+      },
+    }
+  }
+}
+globalThis.document.body.dispatchEvent = (event) => {
+  const dt = event.dataTransfer
+  seen.push({
+    type: event.type,
+    files: [...(dt?.files ?? [])],
+    directoryEntries: [...(dt?.items ?? [])]
+      .filter((i) => i.webkitGetAsEntry?.()?.isDirectory === true).length,
+  })
+  return true
+}
+dispatched.length = 0
+const dir2 = makeDirEntry("d2", [makeFileEntry("a.txt"), makeFileEntry("b.txt")], 1)
+invokeDrop(makeTransfer([dir2]))
+await new Promise((r) => setTimeout(r, 50))
+const handoff = seen.find((s) => s.type === "drop")
+assert.ok(handoff !== undefined, "the hand-off drop must be dispatched")
+assert.equal(
+  handoff.files.length,
+  2,
+  "the hand-off must carry exactly the expanded files",
+)
+assert.equal(
+  handoff.directoryEntries,
+  0,
+  "the hand-off must expose no directory entry, or 0.1.7 would reject it in a browser",
+)
+console.log("PASS: hand-off carries files only (0.1.7 override stays safe)")
+
 console.log("PASS: module contract and listener registration")
 console.log("info log:", consoleInfo[0])
