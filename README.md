@@ -79,14 +79,40 @@ upload path with no directory semantics attached.
 
 ## Compatibility
 
-Developed and verified against **DSH 0.1.6-alpha.2** and re-checked against
-**0.1.7-alpha.1**, where the folder contract changed as described above. The
-plugin touches only two 0.1.7 surfaces, both stable:
+Developed and verified against **DSH 0.1.6-alpha.2**, re-checked against
+**0.1.7-alpha.1** (where the folder contract changed as described above), and
+re-checked again against **0.2.0-rc.1**.
+
+The plugin touches only two surfaces, and both are unchanged in 0.2.0:
 
 - the composer's hidden file input, used purely as a presence probe
   (`[data-composer-card] input[type="file"]`)
 - the document `drop` event, and the core's own bubble-phase listener that
   receives the re-dispatched hand-off
+
+### 0.2.0-rc.1 re-check
+
+The gate this plugin overrides is byte-for-byte the same in 0.2.0, in
+`ui-conversation`'s `addFiles()`:
+
+```js
+const bridge = hostPathBridge();
+// ...
+if (bridge === void 0 && directory) return t("attachment.directoryDesktopOnly");
+```
+
+Also re-verified against the shipped 0.2.0 bundle:
+
+| Surface | 0.2.0-rc.1 |
+|---|---|
+| `globalThis.__DSH_HOST_PATHS__` (read by `hostPathBridge()`) | present in `ui-conversation` |
+| core `drop` listeners | still bubble phase (`ui-attachment`, `ui-workspace`); no capture-phase listener was added |
+| `webkitGetAsEntry` folder walk | still the supported entry API |
+
+0.2.0 adds `installDesktopDirectoryPicker` to the desktop main process, but
+that serves the **workspace** directory picker (`workspace-controller`'s
+`directoryPicker.createDirectory`), not the composer's folder intake. It does
+not affect this plugin.
 
 ## Install
 
